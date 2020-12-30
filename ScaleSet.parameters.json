@@ -1,0 +1,159 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "eastus"
+    },
+    "virtualMachineScaleSetName": {
+      "value": "ScaleSets"
+    },
+    "virtualMachineScaleSetRG": {
+      "value": "VMScaleSets"
+    },
+    "singlePlacementGroup": {
+      "value": "false"
+    },
+    "instanceSize": {
+      "value": "Standard_DS3_v2"
+    },
+    "instanceCount": {
+      "value": "2"
+    },
+    "upgradeMode": {
+      "value": "Manual"
+    },
+    "priority": {
+      "value": "Regular"
+    },
+    "enableAcceleratedNetworking": {
+      "value": "false"
+    },
+    "subnetId": {
+      "value": "/subscriptions/cf2deb86-affb-4ba9-8848-ec9428335fa2/resourceGroups/cczTest/providers/Microsoft.Network/virtualNetworks/cczTest-vnet/subnets/default"
+    },
+    "osDiskType": {
+      "value": "Standard_LRS"
+    },
+    "ephemeralDiskType": {
+      "value": "Local"
+    },
+    "virtualNetworkId": {
+      "value": "/subscriptions/17a60df3-f02e-43a2-b52b-11abb3a53049/resourceGroups/MSAA-Network-rg/providers/Microsoft.Network/virtualNetworks/MSAA-vNET"
+    },
+    "virtualNetworkName": {
+      "value": "MSAA-vNET"
+    },
+    "networkInterfaceConfigurations": {
+      "value": [
+        {
+          "name": "MSAA-vNET-nic01",
+          "primary": true,
+          "subnetId": "/subscriptions/17a60df3-f02e-43a2-b52b-11abb3a53049/resourceGroups/MSAA-Network-rg/providers/Microsoft.Network/virtualNetworks/MSAA-vNET/subnets/AzureFirewallSubnet",
+          "applicationGatewayBackendAddressPools": [],
+          "loadBalancerBackendAddressPools": [
+            {
+              "id": "[parameters('backendPoolId')]"
+            }
+          ],
+          "applicationSecurityGroups": [],
+          "loadBalancerInboundNatPools": [
+            {
+              "id": "[parameters('inboundNatPoolId')]"
+            }
+          ],
+          "enableAcceleratedNetworking": true,
+          "nsgName": "",
+          "nsgId": "",
+          "pipName": ""
+        }
+      ]
+    },
+    "publicIpAddressName": {
+      "value": "ScaleSets-ip"
+    },
+    "backendPoolName": {
+      "value": "bepool"
+    },
+    "backendPoolId": {
+      "value": "/subscriptions/17a60df3-f02e-43a2-b52b-11abb3a53049/resourceGroups/VMScaleSets/providers/Microsoft.Network/loadBalancers/ScaleSets-lb/backendAddressPools/bepool"
+    },
+    "loadBalancerName": {
+      "value": "ScaleSets-lb"
+    },
+    "inboundNatPoolId": {
+      "value": "/subscriptions/17a60df3-f02e-43a2-b52b-11abb3a53049/resourceGroups/VMScaleSets/providers/Microsoft.Network/loadBalancers/ScaleSets-lb/inboundNatPools/natpool"
+    },
+    "vmName": {
+      "value": "ScaleSets"
+    },
+    "scaleInPolicy": {
+      "value": {
+        "rules": [
+          "NewestVM"
+        ]
+      }
+    },
+    "overprovision": {
+      "value": true
+    },
+    "upgradePolicy": {
+      "value": "Automatic"
+    },
+    "adminUsername": {
+      "value": "lntad"
+    },
+    "adminPassword": {
+      "value": "qwe123QWE!@#"
+    },
+    "autoScaleDefault": {
+      "value": "1"
+    },
+    "autoScaleMin": {
+      "value": "1"
+    },
+    "autoScaleMax": {
+      "value": "100"
+    },
+    "scaleOutCPUPercentageThreshold": {
+      "value": "75"
+    },
+    "durationTimeWindow": {
+      "value": "10"
+    },
+    "scaleOutInterval": {
+      "value": "1"
+    },
+    "scaleInCPUPercentageThreshold": {
+      "value": "15"
+    },
+    "scaleInInterval": {
+      "value": "1"
+    },
+    "autoscaleDiagnosticLogsWorkspaceId": {
+      "value": "/subscriptions/17a60df3-f02e-43a2-b52b-11abb3a53049/resourcegroups/msaa-wvdmgt/providers/microsoft.operationalinsights/workspaces/msaa-loganalytics-r345xqot624z2"
+    },
+    "healthExtensionProtocol": {
+      "value": "tcp"
+    },
+    "healthExtensionPort": {
+      "value": 80
+    },
+    "autoRepairsPolicyEnabled": {
+      "value": true
+    },
+    "gracePeriod": {
+      "value": "PT30M"
+    },
+    "zone": {
+      "value": [
+        "1",
+        "2",
+        "3"
+      ]
+    },
+    "platformFaultDomainCount": {
+      "value": "1"
+    }
+  }
+}

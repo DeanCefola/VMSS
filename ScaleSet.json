@@ -1,0 +1,563 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "location": {
+            "type": "string"
+        },
+        "virtualMachineScaleSetName": {
+            "type": "string"
+        },
+        "virtualMachineScaleSetRG": {
+            "type": "string"
+        },
+        "singlePlacementGroup": {
+            "type": "string"
+        },
+        "instanceSize": {
+            "type": "string"
+        },
+        "instanceCount": {
+            "type": "string"
+        },
+        "upgradeMode": {
+            "type": "string"
+        },
+        "priority": {
+            "type": "string"
+        },
+        "enableAcceleratedNetworking": {
+            "type": "string"
+        },
+        "subnetId": {
+            "type": "string"
+        },
+        "osDiskType": {
+            "type": "string"
+        },
+        "ephemeralDiskType": {
+            "type": "string"
+        },
+        "virtualNetworkId": {
+            "type": "string"
+        },
+        "virtualNetworkName": {
+            "type": "string"
+        },
+        "networkInterfaceConfigurations": {
+            "type": "array"
+        },
+        "publicIpAddressName": {
+            "type": "string"
+        },
+        "backendPoolName": {
+            "type": "string"
+        },
+        "backendPoolId": {
+            "type": "string"
+        },
+        "loadBalancerName": {
+            "type": "string"
+        },
+        "inboundNatPoolId": {
+            "type": "string"
+        },
+        "vmName": {
+            "type": "string"
+        },
+        "scaleInPolicy": {
+            "type": "object"
+        },
+        "overprovision": {
+            "type": "bool"
+        },
+        "upgradePolicy": {
+            "type": "string"
+        },
+        "adminUsername": {
+            "type": "string"
+        },
+        "adminPassword": {
+            "type": "secureString"
+        },
+        "autoScaleDefault": {
+            "type": "string"
+        },
+        "autoScaleMin": {
+            "type": "string"
+        },
+        "autoScaleMax": {
+            "type": "string"
+        },
+        "scaleOutCPUPercentageThreshold": {
+            "type": "string"
+        },
+        "durationTimeWindow": {
+            "type": "string"
+        },
+        "scaleOutInterval": {
+            "type": "string"
+        },
+        "scaleInCPUPercentageThreshold": {
+            "type": "string"
+        },
+        "scaleInInterval": {
+            "type": "string"
+        },
+        "autoscaleDiagnosticLogsWorkspaceId": {
+            "type": "string"
+        },
+        "healthExtensionProtocol": {
+            "type": "string"
+        },
+        "healthExtensionPort": {
+            "type": "int"
+        },
+        "autoRepairsPolicyEnabled": {
+            "type": "bool"
+        },
+        "gracePeriod": {
+            "type": "string"
+        },
+        "zone": {
+            "type": "array"
+        },
+        "platformFaultDomainCount": {
+            "type": "string"
+        }
+    },
+    "variables": {
+        "storageApiVersion": "2019-04-01",
+        "loadBalancerId": "[resourceId('Microsoft.Network/loadBalancers', parameters('loadBalancerName'))]",
+        "backendPoolId": "[concat(variables('loadBalancerId'), '/backendAddressPools/', parameters('backendPoolName'))]",
+        "namingInfix": "[toLower(substring(concat(parameters('virtualMachineScaleSetName'), uniqueString(resourceGroup().id)), 0, 9))]",
+        "vmssId": "[resourceId('Microsoft.Compute/virtualMachineScaleSets', parameters('virtualMachineScaleSetName'))]",
+        "autoScaleResourceName": "[concat(parameters('virtualMachineScaleSetName'), 'autoscale')]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Network/publicIPAddresses",
+            "name": "[parameters('publicIpAddressName')]",
+            "location": "[parameters('location')]",
+            "apiVersion": "2019-02-01",
+            "sku": {
+                "name": "Standard"
+            },
+            "properties": {
+                "publicIPAllocationMethod": "Static"
+            },
+            "tags": {
+                "Application": "WVD New Portal",
+                "costcenter": "AA-Money",
+                "Environment": "Lab",
+                "Maintance Window": "3rd Wednesday",
+                "Owner": "WVD Admin",
+                "RemoteApp": "Desktop",
+                "Support Contact": "x1234"
+            }
+        },
+        {
+            "type": "Microsoft.Network/loadBalancers",
+            "name": "[parameters('loadBalancerName')]",
+            "location": "[parameters('location')]",
+            "apiVersion": "2019-02-01",
+            "dependsOn": [
+                "[concat('Microsoft.Network/publicIPAddresses/', parameters('publicIpAddressName'))]"
+            ],
+            "sku": {
+                "name": "Standard"
+            },
+            "properties": {
+                "frontendIPConfigurations": [
+                    {
+                        "name": "LoadBalancerFrontEnd",
+                        "id": "[concat(variables('loadBalancerId'), '/frontendIPConfigurations/loadBalancerFrontEnd')]",
+                        "properties": {
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIpAddresses', parameters('publicIpAddressName'))]"
+                            }
+                        }
+                    }
+                ],
+                "backendAddressPools": [
+                    {
+                        "id": "[variables('backendPoolId')]",
+                        "name": "[parameters('backendPoolName')]"
+                    }
+                ],
+                "inboundNatPools": [
+                    {
+                        "name": "natpool",
+                        "id": "[parameters('inboundNatPoolId')]",
+                        "properties": {
+                            "frontendIPConfiguration": {
+                                "id": "[concat(variables('loadBalancerId'), '/frontendIPConfigurations/loadBalancerFrontEnd')]"
+                            },
+                            "protocol": "tcp",
+                            "frontendPortRangeStart": "50000",
+                            "frontendPortRangeEnd": "50119",
+                            "backendPort": "3389"
+                        }
+                    }
+                ],
+                "probes": [
+                    {
+                        "name": "tcpProbe",
+                        "properties": {
+                            "protocol": "tcp",
+                            "port": 80,
+                            "intervalInSeconds": 5,
+                            "numberOfProbes": 2,
+                            "loadBalancingRules": []
+                        }
+                    }
+                ],
+                "loadBalancingRules": [
+                    {
+                        "name": "LBRule",
+                        "properties": {
+                            "frontendIPConfiguration": {
+                                "id": "[concat(variables('loadBalancerId'), '/frontendIPConfigurations/loadBalancerFrontEnd')]"
+                            },
+                            "backendAddressPool": {
+                                "id": "[variables('backendPoolId')]"
+                            },
+                            "protocol": "tcp",
+                            "frontendPort": 80,
+                            "backendPort": 80,
+                            "enableFloatingIP": false,
+                            "idleTimeoutInMinutes": 5,
+                            "loadDistribution": "Default",
+                            "probe": {
+                                "id": "[concat(variables('loadBalancerId'),'/probes/tcpProbe')]"
+                            }
+                        }
+                    }
+                ]
+            },
+            "tags": {
+                "Application": "WVD New Portal",
+                "costcenter": "AA-Money",
+                "Environment": "Lab",
+                "Maintance Window": "3rd Wednesday",
+                "Owner": "WVD Admin",
+                "RemoteApp": "Desktop",
+                "Support Contact": "x1234"
+            }
+        },
+        {
+            "type": "Microsoft.Insights/autoscaleSettings",
+            "apiVersion": "2015-04-01",
+            "name": "[variables('autoScaleResourceName')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Compute/virtualMachineScaleSets/', parameters('virtualMachineScaleSetName'))]"
+            ],
+            "properties": {
+                "name": "[variables('autoScaleResourceName')]",
+                "targetResourceUri": "[variables('vmssId')]",
+                "enabled": true,
+                "profiles": [
+                    {
+                        "name": "Profile1",
+                        "capacity": {
+                            "minimum": "[parameters('autoScaleMin')]",
+                            "maximum": "[parameters('autoScaleMax')]",
+                            "default": "[parameters('autoScaleDefault')]"
+                        },
+                        "rules": [
+                            {
+                                "metricTrigger": {
+                                    "metricName": "Percentage CPU",
+                                    "metricNamespace": "",
+                                    "metricResourceUri": "[variables('vmssId')]",
+                                    "timeGrain": "PT1M",
+                                    "statistic": "Average",
+                                    "timeWindow": "[concat('PT', parameters('durationTimeWindow'), 'M')]",
+                                    "timeAggregation": "Average",
+                                    "operator": "GreaterThan",
+                                    "threshold": "[parameters('scaleOutCPUPercentageThreshold')]"
+                                },
+                                "scaleAction": {
+                                    "direction": "Increase",
+                                    "type": "ChangeCount",
+                                    "value": "[parameters('scaleOutInterval')]",
+                                    "cooldown": "PT1M"
+                                }
+                            },
+                            {
+                                "metricTrigger": {
+                                    "metricName": "Percentage CPU",
+                                    "metricNamespace": "",
+                                    "metricResourceUri": "[variables('vmssId')]",
+                                    "timeGrain": "PT1M",
+                                    "statistic": "Average",
+                                    "timeWindow": "PT5M",
+                                    "timeAggregation": "Average",
+                                    "operator": "LessThan",
+                                    "threshold": "[parameters('scaleInCPUPercentageThreshold')]"
+                                },
+                                "scaleAction": {
+                                    "direction": "Decrease",
+                                    "type": "ChangeCount",
+                                    "value": "[parameters('scaleInInterval')]",
+                                    "cooldown": "PT1M"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Insights/autoscalesettings/providers/diagnosticSettings",
+            "name": "[concat(variables('autoScaleResourceName'), '/Microsoft.Insights/diagSetting', variables('namingInfix'))]",
+            "dependsOn": [
+                "[variables('autoScaleResourceName')]"
+            ],
+            "apiVersion": "2017-05-01-preview",
+            "properties": {
+                "workspaceId": "[parameters('autoscaleDiagnosticLogsWorkspaceId')]",
+                "logs": [
+                    {
+                        "category": "AutoscaleEvaluations",
+                        "enabled": true
+                    },
+                    {
+                        "category": "AutoscaleScaleActions",
+                        "enabled": true
+                    }
+                ]
+            }
+        },
+        {
+            "name": "[parameters('virtualMachineScaleSetName')]",
+            "type": "Microsoft.Compute/virtualMachineScaleSets",
+            "apiVersion": "2020-06-01",
+            "location": "[parameters('location')]",
+            "copy": {
+                "name": "VMSS-Copy",
+                "count": "[parameters('autoScaleDefault')]"
+            },
+            "dependsOn": [
+                "[variables('loadBalancerId')]"
+            ],
+            "sku": {
+                "name": "[parameters('instanceSize')]",
+                "capacity": "[int(parameters('instanceCount'))]"
+            },
+            "properties": {
+                "overprovision": "[parameters('overprovision')]",
+                "upgradePolicy": {
+                    "mode": "[parameters('upgradePolicy')]"
+                },
+                "singlePlacementGroup": "[parameters('singlePlacementGroup')]",
+                "virtualMachineProfile": {
+                    "storageProfile": {
+                        "osDisk": {
+                            "createOption": "fromImage",
+                            "caching": "ReadOnly",
+                            "managedDisk": {
+                                "storageAccountType": "[parameters('osDiskType')]"
+                            },
+                            "diffDiskSettings": {
+                                "option": "[parameters('ephemeralDiskType')]"
+                            }
+                        },
+                        "imageReference": {
+                            "publisher": "MicrosoftWindowsDesktop",
+                            "offer": "Windows-10",
+                            "sku": "20h2-evd",
+                            "version": "latest"
+                        }
+                    },
+                    "priority": "[parameters('priority')]",
+                    "networkProfile": {
+                        "copy": [
+                            {
+                                "name": "networkInterfaceConfigurations",
+                                "count": "[length(parameters('networkInterfaceConfigurations'))]",
+                                "input": {
+                                    "name": "[parameters('networkInterfaceConfigurations')[copyIndex('networkInterfaceConfigurations')].name]",
+                                    "properties": {
+                                        "primary": "[parameters('networkInterfaceConfigurations')[copyIndex('networkInterfaceConfigurations')].primary]",
+                                        "enableAcceleratedNetworking": "[parameters('networkInterfaceConfigurations')[copyIndex('networkInterfaceConfigurations')].enableAcceleratedNetworking]",
+                                        "ipConfigurations": [
+                                            {
+                                                "name": "[concat(parameters('networkInterfaceConfigurations')[copyIndex('networkInterfaceConfigurations')].name, '-defaultIpConfiguration')]",
+                                                "properties": {
+                                                    "subnet": {
+                                                        "id": "[parameters('networkInterfaceConfigurations')[copyIndex('networkInterfaceConfigurations')].subnetId]"
+                                                    },
+                                                    "primary": "[parameters('networkInterfaceConfigurations')[copyIndex('networkInterfaceConfigurations')].primary]",
+                                                    "applicationGatewayBackendAddressPools": "[parameters('networkInterfaceConfigurations')[copyIndex('networkInterfaceConfigurations')].applicationGatewayBackendAddressPools]",
+                                                    "loadBalancerBackendAddressPools": "[parameters('networkInterfaceConfigurations')[copyIndex('networkInterfaceConfigurations')].loadBalancerBackendAddressPools]",
+                                                    "loadBalancerInboundNatPools": "[parameters('networkInterfaceConfigurations')[copyIndex('networkInterfaceConfigurations')].loadBalancerInboundNatPools]",
+                                                    "publicIPAddressConfiguration": "[if( equals( parameters('networkInterfaceConfigurations')[copyIndex('networkInterfaceConfigurations')].pipName, ''), json('null'), union(json(concat('{\"name\": \"', parameters('networkInterfaceConfigurations')[copyIndex('networkInterfaceConfigurations')].pipName, '\"}'))\n                        ,json('{\"properties\": { \"idleTimeoutInMinutes\": 15}}')))]"
+                                                }
+                                            }
+                                        ],
+                                        "networkSecurityGroup": "[if( equals( parameters('networkInterfaceConfigurations')[copyIndex('networkInterfaceConfigurations')].nsgId, ''), json('null'),json(concat('{\"id\": \"', parameters('networkInterfaceConfigurations')[copyIndex('networkInterfaceConfigurations')].nsgId, '\"}')))]"
+                                    }
+                                }
+                            }
+                        ]
+                    },
+                    "extensionProfile": {
+                        "extensions": [
+                            {
+                                "name": "HealthExtension",
+                                "properties": {
+                                    "publisher": "Microsoft.ManagedServices",
+                                    "type": "ApplicationHealthWindows",
+                                    "typeHandlerVersion": "1.0",
+                                    "autoUpgradeMinorVersion": false,
+                                    "settings": {
+                                        "protocol": "[parameters('healthExtensionProtocol')]",
+                                        "port": "[parameters('healthExtensionPort')]"
+                                    }
+                                }
+                            }
+                        ]
+                    },
+                    "diagnosticsProfile": {
+                        "bootDiagnostics": {
+                            "enabled": true
+                        }
+                    },
+                    "osProfile": {
+                        "computerNamePrefix": "[variables('namingInfix')]",
+                        "adminUsername": "[parameters('adminUsername')]",
+                        "adminPassword": "[parameters('adminPassword')]",
+                        "windowsConfiguration": {
+                            "provisionVmAgent": true
+                        }
+                    },
+                    "licenseType": "Windows_Client"
+                },
+                "scaleInPolicy": "[parameters('scaleInPolicy')]",
+                "automaticRepairsPolicy": {
+                    "enabled": "[parameters('autoRepairsPolicyEnabled')]",
+                    "gracePeriod": "[parameters('gracePeriod')]"
+                },
+                "platformFaultDomainCount": "[parameters('platformFaultDomainCount')]"
+            },
+            "zones": "[parameters('zone')]",
+            "tags": {
+                "Application": "WVD New Portal",
+                "costcenter": "AA-Money",
+                "Environment": "Lab",
+                "Maintance Window": "3rd Wednesday",
+                "Owner": "WVD Admin",
+                "RemoteApp": "Desktop",
+                "Support Contact": "x1234"
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachineScaleSets/extensions",
+            "name": "DomainJoin",
+            "apiversion": "2019-07-01",
+            "location": "[resourceGroup().location]",
+            "copy": {
+                "name": "VMSS-DomainJoin-Copy",
+                "count": "[parameters('autoScaleDefault')]"
+            },
+            "tags": {
+                "displayname": "Join Domain"
+            },
+            "properties": {
+                "publisher": "Microsoft.Compute",
+                "type": "JsonADDomainExtension",
+                "typeHandlerVersion": "1.3",
+                "settings": {
+                    "Name": "MSAzureAcademy.com",                    
+                    "User": "adjoin@MSAzureAcademy.com",
+                    "Restart": "true",
+                    "Options": "3"
+                },
+                "protectedsettings": {
+                    "Password": "[parameters('adminPassword')]"
+                }
+            }
+        },
+        {
+            "name": "Microsoft.CustomScriptExtension-20201222152507",
+            "apiVersion": "2015-01-01",
+            "type": "Microsoft.Resources/deployments",
+            "properties": {
+                "expressionEvaluationOptions": {
+                    "scope": "inner"
+                },
+                "mode": "incremental",
+                "template": {
+                    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "vmName": {
+                            "type": "string"
+                        },
+                        "location": {
+                            "type": "string"
+                        },
+                        "fileUris": {
+                            "type": "string"
+                        },
+                        "arguments": {
+                            "type": "securestring",
+                            "defaultValue": " "
+                        }
+                    },
+                    "variables": {
+                        "UriFileNamePieces": "[split(parameters('fileUris'), '/')]",
+                        "firstFileNameString": "[variables('UriFileNamePieces')[sub(length(variables('UriFileNamePieces')), 1)]]",
+                        "firstFileNameBreakString": "[split(variables('firstFileNameString'), '?')]",
+                        "firstFileName": "[variables('firstFileNameBreakString')[0]]"
+                    },
+                    "resources": [
+                        {
+                            "name": "[concat(parameters('vmName'),'/CustomScriptExtension')]",
+                            "type": "Microsoft.Compute/virtualMachineScaleSets/extensions",
+                            "location": "[parameters('location')]",
+                            "apiVersion": "2015-06-15",
+                            "properties": {
+                                "publisher": "Microsoft.Compute",
+                                "type": "CustomScriptExtension",
+                                "typeHandlerVersion": "1.9",
+                                "autoUpgradeMinorVersion": true,
+                                "settings": {
+                                    "fileUris": "[split(parameters('fileUris'), ' ')]"
+                                },
+                                "protectedSettings": {
+                                    "commandToExecute": "[concat ('powershell -ExecutionPolicy Unrestricted -File ', variables('firstFileName'), ' ', parameters('arguments'))]"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "parameters": {
+                    "vmName": {
+                        "value": "ScaleSets"
+                    },
+                    "location": {
+                        "value": "eastus"
+                    },
+                    "fileUris": {
+                        "value": "https://wvdfslogixeast00.blob.core.windows.net/extensions/New-WVDSessionHost.ps1?sp=r&se=2020-12-23T04:22:35Z&sv=2019-12-12&sr=b&sig=dx3ersef4o7HlCmP2EPvmdwm90qjZPcAJGv5sBCOF28%3D"
+                    },
+                    "arguments": {
+                        "value": "-ProfilePath \\\\MSAzureAcademy.com\\CorpShares\\FSLogix -RegistrationToken eyJhbGciOiJSUzI1NiIsImtpZCI6IkE2MDEzQjgyRUMwRTYxMzYyODhBRDgzMTlFQUM5NjJCMzIyNzY5RkQiLCJ0eXAiOiJKV1QifQ.eyJSZWdpc3RyYXRpb25JZCI6ImZiYzAyMzVmLWU1NmQtNGZjNS05NDE4LWNjMWFjMzk3ZDBmMyIsIkJyb2tlclVyaSI6Imh0dHBzOi8vcmRicm9rZXItZy11cy1yMC53dmRzZWxmaG9zdC5taWNyb3NvZnQuY29tLyIsIkRpYWdub3N0aWNzVXJpIjoiaHR0cHM6Ly9yZGRpYWdub3N0aWNzLWctdXMtcjAud3Zkc2VsZmhvc3QubWljcm9zb2Z0LmNvbS8iLCJFbmRwb2ludFBvb2xJZCI6IjllODg2ZjRkLTBlNTAtNDdmZi04ZmVhLTJiOGNjOTNkZjQ5NSIsIkdsb2JhbEJyb2tlclVyaSI6Imh0dHBzOi8vcmRicm9rZXIud3Zkc2VsZmhvc3QubWljcm9zb2Z0LmNvbS8iLCJHZW9ncmFwaHkiOiJVUyIsIm5iZiI6MTYwODY1NjcwNSwiZXhwIjoxNjA4OTU4ODAwLCJpc3MiOiJSREluZnJhVG9rZW5NYW5hZ2VyIiwiYXVkIjoiUkRtaSJ9.LuDDLvCfI-WdNnj-FPxHhQJtrD6ljDFUhMbfUN_mwIMALrdLNFDXEGMJc-dHN5oUPtgRa9n7jk6ogpFtif7I0Y6E_Uuwcz0ONx7SGt-WRBA6ObDV3kcwt6z3UkDf35WT2EKzzputOyDuf5FiJz_MiPfr1t6J82aVWgPsfiHsy6XndNKWdNGPJ8cEvduXHLuKuMbz3uCLEWsz7y1yaTvjVAttzYgAyR8RPlF291tP7dgvRFMMs6qI0dkSyU_Opb42ZBKdv11EMeHPd7cNZI9ZEN3nUA_A2QjPYEfx1KXPxe9UHN1HwDFzPutZaWgorVMC8iKRdZ0ZaUEycA9TM4N9nQ"
+                    }
+                }
+            },
+            "dependsOn": [
+                "VMSS-DomainJoin-Copy"           
+            ]
+        }
+    ],
+    "outputs": {
+        "adminUsername": {
+            "type": "string",
+            "value": "[parameters('adminUsername')]"
+        }
+    }
+}
